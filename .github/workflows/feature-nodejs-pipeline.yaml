@@ -11,8 +11,6 @@ on:
       environment:
         required: true
         type: string
-env:
-  ACC_ID: 672945439745
 jobs:
   feature-nodejs-pipeline:
     runs-on: self-hosted
@@ -35,29 +33,6 @@ jobs:
     - name: install dependencies
       run: npm install
     - name: run unit tests
-      id: unit_tests
       run: echo "run unit tests"
-
-    - name: Update commit status (final)
-      if: always()
-      uses: ./.github/actions/update-commit-status
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.unit_tests.outcome }}     # success / failure / cancelled
-        context: UNIT_TESTS
-        description: "Docker build ${{ job.status }}"
-
     - name: docker build
-      run: |
-        docker build -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
-        docker images
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v5.1.1
-      with:
-        aws-region: us-east-1
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    - name: push image
-      run: |
-        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com
-        docker push ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+      run: docker build -t 672945439745.dkr.ecr.us-east-1.amazonaws.com/roboshop/catalogue:latest
