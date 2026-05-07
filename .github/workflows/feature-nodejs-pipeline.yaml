@@ -15,7 +15,7 @@ env:
   ACC_ID: 672945439745
 jobs:
   feature-nodejs-pipeline:
-    runs-on: self-hosted, Linux, X64
+    runs-on: [self-hosted, Linux, X64]
     steps:
     - name: checkout code
       uses: actions/checkout@v6
