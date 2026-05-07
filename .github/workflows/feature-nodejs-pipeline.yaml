@@ -12,7 +12,7 @@ on:
         required: true
         type: string
 env:
-  ACC_ID: 160885265516
+  ACC_ID: 672945439745
 jobs:
   feature-nodejs-pipeline:
     runs-on: self-hosted
