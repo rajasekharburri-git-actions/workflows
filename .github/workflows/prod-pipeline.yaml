@@ -89,7 +89,7 @@ jobs:
 
       - name: Update Deploy status
         if: always()
-    uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
         with:
           sha: ${{ inputs.version }}
           state: ${{ steps.prod_deploy.outcome }}     # success / failure / cancelled
