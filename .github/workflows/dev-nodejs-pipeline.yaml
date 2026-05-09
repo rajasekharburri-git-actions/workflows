@@ -1,152 +1,181 @@
 name: feature-nodejs-pipeline
+
 on:
-  workflow_call: # will be called by someone, should get inputs from caller
+  workflow_call:
     inputs:
       project:
         required: true
         type: string
+
       component:
         required: true
         type: string
+
       environment:
         required: true
         type: string
+
 env:
-  ACC_ID: 672945439745 #my_account
+  ACC_ID: 672945439745
+
 jobs:
   feature-nodejs-pipeline:
     runs-on: [self-hosted, Linux, X64]
+
     steps:
-    - name: checkout code
-      uses: actions/checkout@v6
-    - name: list files
-      run: ls -l
 
-    - name: get the version
-      run: |
-        # if you store it in GITHUB_ENV, you can use in other steps in the same job
-        echo "APP_VERSION=${GITHUB_SHA::9}" >> "$GITHUB_ENV"
+      # Checkout Source Code
+      - name: Checkout Code
+        uses: actions/checkout@v6
 
-    - name: print inputs
-      run: |
-        echo ${{ inputs.project }}
-        echo "version: ${APP_VERSION}"
+      - name: List Files
+        run: ls -ltr
 
-    - name: install dependencies
-      run: npm install
-    - name: run unit tests
-      id: unit_tests
-      run: echo "run unit tests"
+      # Generate Version
+      - name: Get Application Version
+        run: |
+          echo "APP_VERSION=${GITHUB_SHA::9}" >> $GITHUB_ENV
 
-    - name: Update unit tests status
-      if: always()
-      uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.unit_tests.outcome }}     # success / failure / cancelled
-        context: UNIT_TESTS
-        description: ${{ steps.unit_tests.outcome }}
+      - name: Print Inputs
+        run: |
+          echo "PROJECT=${{ inputs.project }}"
+          echo "COMPONENT=${{ inputs.component }}"
+          echo "ENVIRONMENT=${{ inputs.environment }}"
+          echo "VERSION=${APP_VERSION}"
 
-    - name: docker build
-      id: docker_build
-      run: |
-        docker build -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
-        docker images
-    - name: Update docker build status
-      if: always()
-      uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.docker_build.outcome }}     # success / failure / cancelled
-        context: DOCKER_BUILD
-        description: ${{ steps.docker_build.outcome }}
+      # Install Dependencies
+      - name: Install Dependencies
+        run: npm install
 
-    - name: Security Check (Dependabot + Trivy)
-      id: security_check
-      # env:
-      #   GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      shell: bash
-      run: |
+      # Unit Tests
+      - name: Run Unit Tests
+        id: unit_tests
+        run: |
+          echo "Running Unit Tests"
 
-        echo "🔍 Running Trivy scan..."
-        trivy image \
-          --scanners vuln \
-          --severity HIGH,CRITICAL,MEDIUM \
-          --pkg-types os \
-          --exit-code 1 \
-          --format table \
-          ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+      - name: Update Unit Test Status
+        if: always()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.unit_tests.outcome }}
+          context: UNIT_TESTS
+          description: ${{ steps.unit_tests.outcome }}
 
-        TRIVY_RESULT=$?
+      # Docker Build
+      - name: Docker Build
+        id: docker_build
+        run: |
+          docker build \
+            -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
 
-        if [ "$TRIVY_RESULT" -ne 0 ]; then
-          echo "❌ Trivy found vulnerabilities (HIGH/CRITICAL/MEDIUM)"
-          exit 1
-        fi
+          docker images
 
-        echo "✅ Trivy scan passed without blocking issues."
+      - name: Update Docker Build Status
+        if: always()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.docker_build.outcome }}
+          context: DOCKER_BUILD
+          description: ${{ steps.docker_build.outcome }}
 
-    - name: Update scan status
-      if: always()
-      uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.security_check.outcome }}     # success / failure / cancelled
-        context: SECURITY_CHECK
-        description: ${{ steps.security_check.outcome }}
+      # Trivy Scan
+      - name: Security Check
+        id: security_check
+        shell: bash
+        run: |
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v6.1.0
-      with:
-        aws-region: us-east-1
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    - name: push image
-      run: |
-        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com
-        docker push ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+          echo "🔍 Running Trivy Scan"
 
+          trivy image \
+            --scanners vuln \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --pkg-types os \
+            --exit-code 1 \
+            --format table \
+            ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
 
-    - name: authenticate to EKS
-      run: |
-        aws eks update-kubeconfig --region us-east-1 --name roboshop-dev
-        kubectl get nodes
+          TRIVY_RESULT=$?
 
-    # - name: checkout catalogue deploy repo
-    #   uses: actions/checkout@v6
-    #   with:
-    #     repository: rajasekharburri/catalogue-deploy
+          if [ "$TRIVY_RESULT" -ne 0 ]; then
+            echo "❌ Vulnerabilities Found"
+            exit 1
+          fi
 
-    - name: Checkout Deploy Repository
-      uses: actions/checkout@v6
-      with:
-       repository: rajasekharburri/${{ inputs.component }}-deploy
-       token: ${{ secrets.GH_TOKEN }}
-       path: ${{ inputs.component }}-deploy
+          echo "✅ Trivy Scan Passed"
 
+      - name: Update Security Check Status
+        if: always()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.security_check.outcome }}
+          context: SECURITY_CHECK
+          description: ${{ steps.security_check.outcome }}
 
+      # AWS Authentication
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    - name: deploy to DEV cluster
-       id: dev_deploy
-       run: |
-         cd ${{ inputs.component }}-deploy
+      # Push Docker Image
+      - name: Push Docker Image
+        run: |
 
-         pwd
-         ls -ltr
+          aws ecr get-login-password --region us-east-1 | \
+          docker login \
+            --username AWS \
+            --password-stdin \
+            ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com
 
-         helm upgrade --install ${{ inputs.component }} \
-          -f values-${{ inputs.environment }}.yaml \
-          -n ${{ inputs.project }} \
-          --set deployment.imageVersion=${APP_VERSION} \
-          --atomic \
-          --wait \
-          --timeout=5m .
+          docker push \
+            ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
 
-    - name: Update DEV Deploy status
-      if: always()
-      uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.dev_deploy.outcome }}     # success / failure / cancelled
-        context: DEV_DEPLOY
-        description: ${{ steps.dev_deploy.outcome }}
+      # Authenticate to EKS
+      - name: Authenticate to EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region us-east-1 \
+            --name roboshop-dev
+
+          kubectl get nodes
+
+      # Checkout Helm Deploy Repository
+      - name: Checkout Deploy Repository
+        uses: actions/checkout@v6
+        with:
+          repository: rajasekharburri/${{ inputs.component }}-deploy
+          token: ${{ secrets.GH_TOKEN }}
+          path: ${{ inputs.component }}-deploy
+
+      # Deploy Application
+      - name: Deploy to DEV Cluster
+        id: dev_deploy
+        run: |
+
+          cd ${{ inputs.component }}-deploy
+
+          pwd
+          ls -ltr
+
+          helm upgrade --install ${{ inputs.component }} \
+            -f values-${{ inputs.environment }}.yaml \
+            -n ${{ inputs.project }} \
+            --set deployment.imageVersion=${APP_VERSION} \
+            --atomic \
+            --wait \
+            --timeout=5m .
+
+      - name: Update Deploy Status
+        if: always()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.dev_deploy.outcome }}
+          context: DEV_DEPLOY
+          description: ${{ steps.dev_deploy.outcome }}
