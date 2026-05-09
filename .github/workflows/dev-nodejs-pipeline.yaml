@@ -122,7 +122,7 @@ jobs:
       with:
        repository: rajasekharburri/${{ inputs.component }}-deploy
        token: ${{ secrets.GH_TOKEN }}
-       path: cart-deploy
+       path: ${{ inputs.component }}-deploy
 
 
 
