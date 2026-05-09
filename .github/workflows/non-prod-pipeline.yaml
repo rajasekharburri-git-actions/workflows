@@ -84,7 +84,7 @@
 #       - name: checkout catalogue deploy repo
 #         uses: actions/checkout@v6
 #         with:
-#           repository: rajasekharburri/catalogue-deploy
+#           repository: rajasekharburri-git-actions/catalogue-deploy
 
 #       - name: deploy to ${{ inputs.environment }} cluster
 #         id: uat_deploy
@@ -92,7 +92,7 @@
 
 #       - name: Update Deploy status
 #         if: always()
-#         uses: rajasekharburri/workflows/.github/actions/update-commit-status@main
+#         uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
 #         with:
 #           sha: ${{ inputs.version }}
 #           state: ${{ steps.uat_deploy.outcome }}     # success / failure / cancelled
