@@ -115,7 +115,7 @@ jobs:
     - name: checkout catalogue deploy repo
       uses: actions/checkout@v6
       with:
-        repository: rajasekharburri-git-actions/catalogue-deploy
+        repository: rajasekharburri/catalogue-deploy
 
     - name: deploy to DEV cluster
       id: dev_deploy
