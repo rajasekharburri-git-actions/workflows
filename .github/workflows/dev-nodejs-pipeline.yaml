@@ -117,12 +117,13 @@ jobs:
     #   with:
     #     repository: rajasekharburri/catalogue-deploy
 
-    -  name: Checkout Deploy Repository
-       uses: actions/checkout@v6
-       with:
-          repository: rajasekharburri/${{ inputs.component }}-deploy
-          token: ${{ secrets.GH_TOKEN }}
-          path: deploy
+    - name: Checkout Deploy Repository
+      uses: actions/checkout@v6
+      with:
+       repository: rajasekharburri/${{ inputs.component }}-deploy
+       token: ${{ secrets.GH_TOKEN }}
+       path: cart-deploy
+
 
 
     - name: deploy to DEV cluster
