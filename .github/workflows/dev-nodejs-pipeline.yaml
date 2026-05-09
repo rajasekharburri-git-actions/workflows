@@ -11,12 +11,11 @@ on:
       environment:
         required: true
         type: string
-        
 env:
-  ACC_ID: 672945439745
+  ACC_ID: 672945439745 #my_account
 jobs:
   feature-nodejs-pipeline:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux, X64]
     steps:
     - name: checkout code
       uses: actions/checkout@v6
@@ -97,7 +96,7 @@ jobs:
         description: ${{ steps.security_check.outcome }}
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v5.1.1
+      uses: aws-actions/configure-aws-credentials@v6.1.0
       with:
         aws-region: us-east-1
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -106,6 +105,7 @@ jobs:
       run: |
         aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com
         docker push ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+
 
     - name: authenticate to EKS
       run: |
