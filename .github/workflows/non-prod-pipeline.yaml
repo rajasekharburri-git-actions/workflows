@@ -6,6 +6,9 @@ on:
       version:
         required: true
         type: string
+      component:
+        required: true
+        type: string
       environment:
         required: true
         type: string
@@ -84,11 +87,11 @@ jobs:
       - name: checkout deploy repo
         uses: actions/checkout@v6
         with:
-          repository: rajasekharburri/user-deploy
+          repository: rajasekharburri/${{ inputs.component }}-deploy
 
       - name: deploy to ${{ inputs.environment }} cluster
         id: uat_deploy
-        run: "helm upgrade --install catalogue -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
+        run: "helm upgrade --install ${{ inputs.component}} -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
       - name: Update Deploy status
         if: always()
