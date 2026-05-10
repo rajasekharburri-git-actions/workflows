@@ -6,53 +6,101 @@ on:
       project:
         required: true
         type: string
-
       component:
         required: true
         type: string
-
       environment:
         required: true
         type: string
 
 jobs:
-  feature-build:
-    runs-on: self-hosted
-
-    env:
-      APP_NAME: ${{ inputs.component }}
-      ENVIRONMENT: ${{ inputs.environment }}
+  feature-java-pipeline:
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
-      - name: Checkout Source
-        uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v5
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-          cache: maven
+          cache: maven                                     # ✅ equivalent of npm cache
 
-      - name: Verify Files
+      - name: List files
+        run: ls -l
+
+      - name: Get the version
+        run: echo "APP_VERSION=${GITHUB_SHA::9}" >> "$GITHUB_ENV"
+
+      - name: Print inputs
         run: |
-          pwd
-          ls -la
-          test -f pom.xml
+          echo ${{ inputs.project }}
+          echo "version: ${APP_VERSION}"
 
-      - name: Maven Build
+      - name: Run unit tests                              # ✅ separated from build, like npm test
+        id: unit_tests
+        run: mvn test
+
+      - name: Update unit tests status
+        if: success() || failure()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.unit_tests.outcome }}
+          context: UNIT_TESTS
+          description: ${{ steps.unit_tests.outcome }}
+
+      - name: Maven build                                 # ✅ skips tests since they ran above
         run: mvn clean package -DskipTests
 
-      - name: List Target Files
-        run: ls -la target/
-
-      - name: Build Docker Image
+      - name: Docker build
+        id: docker_build
         run: |
-          docker build -t ${APP_NAME}:${GITHUB_SHA} .
+          docker build \
+            -t ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
+          docker images
 
-      - name: Docker Images
-        run: docker images
+      - name: Update docker build status
+        if: success() || failure()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.docker_build.outcome }}
+          context: DOCKER_BUILD
+          description: ${{ steps.docker_build.outcome }}
 
-      - name: Cleanup Old Docker Images
+      - name: Security scan (Trivy)
+        id: security_check
         run: |
-          docker image prune -f
+          echo "🔍 Running Trivy scan..."
+          trivy image \
+            --scanners vuln \
+            --severity HIGH,CRITICAL,MEDIUM \
+            --pkg-types os \
+            --exit-code 1 \
+            --format table \
+            ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+          echo "✅ Trivy scan passed."
+
+      - name: Update scan status
+        if: success() || failure()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.security_check.outcome }}
+          context: SECURITY_CHECK
+          description: ${{ steps.security_check.outcome }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/github-actions-role
+          aws-region: us-east-1
+
+      - name: Push image to ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+          docker push ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
