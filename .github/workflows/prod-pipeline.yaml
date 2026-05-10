@@ -6,6 +6,9 @@ on:
       version:
         required: true
         type: string
+      component:
+        required: true
+        type: string
         
 permissions:
   contents: read
