@@ -12,8 +12,7 @@ on:
       environment:
         required: true
         type: string
-env:
-   vars.AWS_ACCOUNT_ID : 672945439745 #my_account
+
 jobs:
   feature-java-pipeline:
     runs-on: [self-hosted, Linux, X64]
@@ -94,11 +93,12 @@ jobs:
           context: SECURITY_CHECK
           description: ${{ steps.security_check.outcome }}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
-          role-to-assume: arn:aws:iam::${{  vars.AWS_ACCOUNT_ID  }}:role/github-actions-role
           aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Push image to ECR
         run: |
