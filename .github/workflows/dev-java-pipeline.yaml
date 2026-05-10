@@ -12,17 +12,19 @@ on:
       environment:
         required: true
         type: string
+env:
+  ACC_ID: 672945439745
 
 jobs:
   dev-java-pipeline:
-    runs-on: [self-hosted, Linux, X64]                   # ✅ explicit runner labels
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6                         # ✅ fixed from v6
+        uses: actions/checkout@v6                          # ✅ fixed
 
       - name: Setup Java 17
-        uses: actions/setup-java@v5                       # ✅ fixed from v5
+        uses: actions/setup-java@v5                        # ✅ fixed
         with:
           distribution: temurin
           java-version: 17
@@ -32,11 +34,75 @@ jobs:
         run: ls -l
 
       - name: Get the version
-        run: echo "APP_VERSION=${GITHUB_SHA::9}" >> "$GITHUB_ENV"   # ✅ short SHA, consistent with feature pipeline
+        run: echo "APP_VERSION=${GITHUB_SHA::9}" >> "$GITHUB_ENV"
 
       - name: Print inputs
         run: |
           echo ${{ inputs.project }}
           echo "version: ${APP_VERSION}"
 
-      - name: Run unit tests                              # ✅ separated & gated step (
+      - name: Run unit tests
+        id: unit_tests
+        run: mvn test
+
+      - name: Update unit tests status
+        if: success() || failure()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.unit_tests.outcome }}
+          context: UNIT_TESTS
+          description: ${{ steps.unit_tests.outcome }}
+
+      - name: Maven build
+        run: mvn clean package -DskipTests
+
+      - name: Docker build
+        id: docker_build
+        run: |
+          docker build \
+            -t ${{ ACC_ID }}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
+          docker images
+
+      - name: Update docker build status
+        if: success() || failure()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.docker_build.outcome }}
+          context: DOCKER_BUILD
+          description: ${{ steps.docker_build.outcome }}
+
+      - name: Security scan (Trivy)
+        id: security_check
+        run: |
+          echo "🔍 Running Trivy scan..."
+          trivy image \
+            --scanners vuln \
+            --severity HIGH,CRITICAL,MEDIUM \
+            --pkg-types os \
+            --exit-code 1 \
+            --format table \
+            ${{ ACC_ID }}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+          echo "✅ Trivy scan passed."
+
+      - name: Update scan status
+        if: success() || failure()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.security_check.outcome }}
+          context: SECURITY_CHECK
+          description: ${{ steps.security_check.outcome }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4    # ✅ correct
+        with:
+          role-to-assume: arn:aws:iam::${{ ACC_ID }}:role/github-actions-role
+          aws-region: us-east-1
+
+      - name: Push image to ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin ${{ ACC_ID }}.dkr.ecr.us-east-1.amazonaws.com
+          docker push ${{ ACC_ID }}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
