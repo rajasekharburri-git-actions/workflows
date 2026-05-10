@@ -84,7 +84,7 @@ jobs:
       - name: checkout deploy repo
         uses: actions/checkout@v6
         with:
-          repository: rajasekharburri/${{ inputs.component }}-deploy
+          repository: rajasekharburri/user-deploy
 
       - name: deploy to ${{ inputs.environment }} cluster
         id: uat_deploy
