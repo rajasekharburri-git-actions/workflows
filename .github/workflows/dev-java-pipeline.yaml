@@ -6,64 +6,37 @@ on:
       project:
         required: true
         type: string
-
       component:
         required: true
         type: string
-
       environment:
         required: true
         type: string
 
 jobs:
-  dev-build-deploy:
-    runs-on: self-hosted
-
-    env:
-      APP_NAME: ${{ inputs.component }}
-      ENVIRONMENT: ${{ inputs.environment }}
+  dev-java-pipeline:
+    runs-on: [self-hosted, Linux, X64]                   # ✅ explicit runner labels
 
     steps:
-      - name: Checkout Source
-        uses: actions/checkout@v6
+      - name: Checkout code
+        uses: actions/checkout@v6                         # ✅ fixed from v6
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v5
+      - name: Setup Java 17
+        uses: actions/setup-java@v5                       # ✅ fixed from v5
         with:
           distribution: temurin
           java-version: 17
           cache: maven
 
-      - name: Verify Files
+      - name: List files
+        run: ls -l
+
+      - name: Get the version
+        run: echo "APP_VERSION=${GITHUB_SHA::9}" >> "$GITHUB_ENV"   # ✅ short SHA, consistent with feature pipeline
+
+      - name: Print inputs
         run: |
-          pwd
-          ls -la
-          test -f pom.xml
+          echo ${{ inputs.project }}
+          echo "version: ${APP_VERSION}"
 
-      - name: Maven Build
-        run: mvn clean package -DskipTests
-
-      - name: Build Docker Image
-        run: |
-          docker build -t ${APP_NAME}:${GITHUB_SHA} .
-          docker tag ${APP_NAME}:${GITHUB_SHA} ${APP_NAME}:latest
-
-      - name: Docker Images
-        run: docker images
-
-      # OPTIONAL:
-      # Push image to ECR/DockerHub here
-
-      # Example:
-      #
-      # - name: Login to ECR
-      #   uses: aws-actions/amazon-ecr-login@v2
-      #
-      # - name: Push Image
-      #   run: |
-      #     docker tag ${APP_NAME}:latest <ECR_REPO>:latest
-      #     docker push <ECR_REPO>:latest
-
-      - name: Cleanup Docker Images
-        run: |
-          docker image prune -f
+      - name: Run unit tests                              # ✅ separated & gated step (
