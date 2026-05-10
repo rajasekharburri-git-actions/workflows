@@ -9,9 +9,7 @@ on:
       environment:
         required: true
         type: string
-      component:           # ← ADD THIS
-        required: true
-        type: string
+        
 permissions:
   contents: read
   statuses: write
