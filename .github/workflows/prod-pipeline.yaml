@@ -89,8 +89,9 @@ jobs:
 
       - name: deploy to prod cluster
         id: prod_deploy
-        run: "helm upgrade --install catalogue -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
+        run: "helm upgrade --install ${{ inputs.component}} -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
+      
       - name: Update Deploy status
         if: always()
         uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
