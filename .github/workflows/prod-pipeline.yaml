@@ -78,11 +78,11 @@ jobs:
           aws eks update-kubeconfig --region us-east-1 --name roboshop-dev
           kubectl get nodes
 
-      - name: checkout catalogue deploy repo
+      - name: checkout deploy repo
         uses: actions/checkout@v6
         with:
-          repository: rajasekharburri/catalogue-deploy
-
+         repository: rajasekharburri/${{ inputs.component }}-deploy
+         
       - name: deploy to prod cluster
         id: prod_deploy
         run: "helm upgrade --install catalogue -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
