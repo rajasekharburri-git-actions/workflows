@@ -6,12 +6,15 @@ on:
       version:
         required: true
         type: string
+
       component:
         required: true
         type: string
+
       environment:
         required: true
         type: string
+
 permissions:
   contents: read
   statuses: write
@@ -23,19 +26,19 @@ jobs:
     steps:
       - name: Compute short commit
         id: commit
+        shell: bash
         run: |
           SHORT_SHA="${{ inputs.version }}"
           APP_VERSION="${SHORT_SHA:0:9}"
 
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "App version: $APP_VERSION"
-          
 
       - name: Check required commit statuses
         id: gate
         shell: bash
         run: |
-          echo "🔍 Checking commit statuses for ${{ inputs.version }}"
+          echo "Checking commit statuses for ${{ inputs.version }}"
 
           REQUIRED_CONTEXTS=(
             "DEV_DEPLOY"
@@ -56,22 +59,22 @@ jobs:
               ".[] | select(.context == \"$CONTEXT\") | .state" | head -n 1)
 
             if [ -z "$STATE" ]; then
-              echo "❌ $CONTEXT → status missing"
+              echo "$CONTEXT status missing"
               FAILED=1
             elif [ "$STATE" != "success" ]; then
-              echo "❌ $CONTEXT → $STATE"
+              echo "$CONTEXT -> $STATE"
               FAILED=1
             else
-              echo "✅ $CONTEXT → success"
+              echo "$CONTEXT -> success"
             fi
           done
 
           if [ "$FAILED" -eq 1 ]; then
-            echo "🚫 UAT gate failed"
+            echo "NON-PROD gate failed"
             exit 1
           fi
 
-          echo "🎉 All required checks passed"
+          echo "All required checks passed"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6.1.0
@@ -80,42 +83,44 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: authenticate to EKS
+      - name: Authenticate to EKS
         run: |
-          aws eks update-kubeconfig --region us-east-1 --name roboshop-dev
+          aws eks update-kubeconfig \
+            --region us-east-1 \
+            --name roboshop-dev
+
           kubectl get nodes
 
-      - name: checkout deploy repo
+      - name: Checkout deploy repo
         uses: actions/checkout@v6
         with:
           repository: rajasekharburri/${{ inputs.component }}-deploy
 
-      - name: deploy to ${{ inputs.environment }} cluster
-        id: uat_deploy
-        run: "helm upgrade --install ${{ inputs.component}} -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
-      
       - name: Verify image exists
+        id: verify_image
         run: |
-         aws ecr describe-images \
-          --repository-name roboshop/user \
-          --image-ids imageTag=${APP_VERSION} \
-          --region us-east-1
+          aws ecr describe-images \
+            --repository-name roboshop/${{ inputs.component }} \
+            --image-ids imageTag=${APP_VERSION} \
+            --region us-east-1
 
-      - name: deploy to ${{ inputs.environment }} cluster
-        id: uat_deploy
+      - name: Deploy to ${{ inputs.environment }} cluster
+        id: nonprod_deploy
         run: |
           helm upgrade --install ${{ inputs.component }} \
-          -f values-${{ inputs.environment }}.yaml \
-          -n roboshop \
-          --set deployment.imageVersion=${APP_VERSION} \
-          --atomic --wait --timeout=5m .
-
+            -f values-${{ inputs.environment }}.yaml \
+            -n roboshop \
+            --set deployment.imageVersion=${APP_VERSION} \
+            --atomic \
+            --wait \
+            --timeout=5m \
+            .
 
       - name: Update Deploy status
         if: always()
         uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
         with:
           sha: ${{ inputs.version }}
-          state: ${{ steps.uat_deploy.outcome }}     # success / failure / cancelled
+          state: ${{ steps.nonprod_deploy.outcome }}
           context: UAT_DEPLOY
-          description: ${{ steps.uat_deploy.outcome }}
+          description: ${{ steps.nonprod_deploy.outcome }}
