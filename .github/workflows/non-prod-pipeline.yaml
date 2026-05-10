@@ -6,15 +6,9 @@ on:
       version:
         required: true
         type: string
-
-      component:
-        required: true
-        type: string
-
       environment:
         required: true
         type: string
-
 permissions:
   contents: read
   statuses: write
@@ -26,19 +20,19 @@ jobs:
     steps:
       - name: Compute short commit
         id: commit
-        shell: bash
         run: |
           SHORT_SHA="${{ inputs.version }}"
           APP_VERSION="${SHORT_SHA:0:9}"
 
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "App version: $APP_VERSION"
+          
 
       - name: Check required commit statuses
         id: gate
         shell: bash
         run: |
-          echo "Checking commit statuses for ${{ inputs.version }}"
+          echo "🔍 Checking commit statuses for ${{ inputs.version }}"
 
           REQUIRED_CONTEXTS=(
             "DEV_DEPLOY"
@@ -59,68 +53,48 @@ jobs:
               ".[] | select(.context == \"$CONTEXT\") | .state" | head -n 1)
 
             if [ -z "$STATE" ]; then
-              echo "$CONTEXT status missing"
+              echo "❌ $CONTEXT → status missing"
               FAILED=1
             elif [ "$STATE" != "success" ]; then
-              echo "$CONTEXT -> $STATE"
+              echo "❌ $CONTEXT → $STATE"
               FAILED=1
             else
-              echo "$CONTEXT -> success"
+              echo "✅ $CONTEXT → success"
             fi
           done
 
           if [ "$FAILED" -eq 1 ]; then
-            echo "NON-PROD gate failed"
+            echo "🚫 UAT gate failed"
             exit 1
           fi
 
-          echo "All required checks passed"
+          echo "🎉 All required checks passed"
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v6.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
           aws-region: us-east-1
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Authenticate to EKS
+      - name: authenticate to EKS
         run: |
-          aws eks update-kubeconfig \
-            --region us-east-1 \
-            --name roboshop-dev
-
+          aws eks update-kubeconfig --region us-east-1 --name roboshop-dev
           kubectl get nodes
 
-      - name: Checkout deploy repo
+      - name: checkout catalogue deploy repo
         uses: actions/checkout@v6
         with:
-          repository: rajasekharburri/${{ inputs.component }}-deploy
+          repository: rajasekharburri-git-actions/catalogue-deploy
 
-      - name: Verify image exists
-        id: verify_image
-        run: |
-          aws ecr describe-images \
-            --repository-name roboshop/${{ inputs.component }} \
-            --image-ids imageTag=${APP_VERSION} \
-            --region us-east-1
-
-      - name: Deploy to ${{ inputs.environment }} cluster
-        id: nonprod_deploy
-        run: |
-          helm upgrade --install ${{ inputs.component }} \
-            -f values-${{ inputs.environment }}.yaml \
-            -n roboshop \
-            --set deployment.imageVersion=${APP_VERSION} \
-            --atomic \
-            --wait \
-            --timeout=5m \
-            .
+      - name: deploy to ${{ inputs.environment }} cluster
+        id: uat_deploy
+        run: "helm upgrade --install catalogue -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
       - name: Update Deploy status
         if: always()
         uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
         with:
           sha: ${{ inputs.version }}
-          state: ${{ steps.nonprod_deploy.outcome }}
+          state: ${{ steps.uat_deploy.outcome }}     # success / failure / cancelled
           context: UAT_DEPLOY
-          description: ${{ steps.nonprod_deploy.outcome }}
+          description: ${{ steps.uat_deploy.outcome }}
