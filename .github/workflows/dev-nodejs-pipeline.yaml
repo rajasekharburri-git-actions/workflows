@@ -120,6 +120,7 @@ jobs:
 
     - name: deploy to DEV cluster
       id: dev_deploy
+      working-directory: deploy-repo
       run:
         "helm upgrade --install ${{ inputs.component}} -f values-${{ inputs.environment }}.yaml -n ${{ inputs.project }} --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
