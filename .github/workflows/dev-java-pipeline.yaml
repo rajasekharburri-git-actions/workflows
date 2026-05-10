@@ -95,10 +95,11 @@ jobs:
           description: ${{ steps.security_check.outcome }}
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4    # ✅ correct
+        uses: aws-actions/configure-aws-credentials@v6.1.0    # ✅ correct
         with:
-          role-to-assume: arn:aws:iam::${{  vars.AWS_ACCOUNT_ID  }}:role/github-actions-role
           aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Push image to ECR
         run: |
