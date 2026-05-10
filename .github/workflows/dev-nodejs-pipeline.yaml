@@ -154,22 +154,11 @@ jobs:
           path: ${{ inputs.component }}-deploy
 
       # Deploy Application
-      - name: Deploy to DEV Cluster
+      - name: deploy to DEV cluster
         id: dev_deploy
-        run: |
+        run:
+          "helm upgrade --install ${{ inputs.component}} -f values-${{ inputs.environment }}.yaml -n ${{ inputs.project }} --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
-          cd ${{ inputs.component }}-deploy
-
-          pwd
-          ls -ltr
-
-          helm upgrade --install ${{ inputs.component }} \
-            -f values-${{ inputs.environment }}.yaml \
-            -n ${{ inputs.project }} \
-            --set deployment.imageVersion=${APP_VERSION} \
-            --atomic \
-            --wait \
-            --timeout=5m .
 
       - name: Update Deploy Status
         if: always()
