@@ -116,11 +116,9 @@ jobs:
       uses: actions/checkout@v6
       with:
         repository: rajasekharburri/${{ inputs.component }}-deploy
-        path: deploy-repo
 
     - name: deploy to DEV cluster
       id: dev_deploy
-      working-directory: deploy-repo
       run:
         "helm upgrade --install ${{ inputs.component}} -f values-${{ inputs.environment }}.yaml -n ${{ inputs.project }} --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
