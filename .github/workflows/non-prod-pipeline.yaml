@@ -74,7 +74,7 @@ jobs:
           echo "🎉 All required checks passed"
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5.1.1
+        uses: aws-actions/configure-aws-credentials@v6.1.0
         with:
           aws-region: us-east-1
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -84,20 +84,22 @@ jobs:
           aws eks update-kubeconfig --region us-east-1 --name roboshop-dev
           kubectl get nodes
 
-      - name: checkout catalogue deploy repo
+      
+      - name: checkout deploy repo
         uses: actions/checkout@v6
         with:
-          repository: rajasekharburri-git-actions/catalogue-deploy
+           repository: rajasekharburri/${{ inputs.component }}-deploy
 
-      - name: deploy to ${{ inputs.environment }} cluster
-        id: uat_deploy
-        run: "helm upgrade --install catalogue -f values-dev.yaml -n roboshop --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
+      - name: deploy to DEV cluster
+        id: dev_deploy
+        run:
+         "helm upgrade --install ${{ inputs.component}} -f values-${{ inputs.environment }}.yaml -n ${{ inputs.project }} --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
-      - name: Update Deploy status
+      - name: Update DEV Deploy status
         if: always()
         uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
         with:
-          sha: ${{ inputs.version }}
-          state: ${{ steps.uat_deploy.outcome }}     # success / failure / cancelled
-          context: UAT_DEPLOY
-          description: ${{ steps.uat_deploy.outcome }}
+          sha: ${{ github.sha }}
+          state: ${{ steps.dev_deploy.outcome }}     # success / failure / cancelled
+          context: DEV_DEPLOY
+          description: ${{ steps.dev_deploy.outcome }}
