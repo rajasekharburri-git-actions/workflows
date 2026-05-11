@@ -136,8 +136,8 @@ jobs:
         id: dev_deploy
         run: |
           helm upgrade --install ${{ inputs.component }} \
-            -f values-${{ inputs.environment }}.yaml \
-            -n ${{ inputs.project }} \
+            -f values-dev.yaml \
+            -n roboshop \
             --set deployment.imageVersion=${APP_VERSION} \
             --atomic \
             --wait \
