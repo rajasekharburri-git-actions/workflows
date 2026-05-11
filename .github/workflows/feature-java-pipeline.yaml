@@ -3,15 +3,15 @@ name: feature-java-pipeline
 on:
   workflow_call:
     inputs:
-      project:
-        required: true
-        type: string
-      component:
-        required: true
-        type: string
-      environment:
-        required: true
-        type: string
+    project:
+      required: true
+      type: string
+    component:
+      required: true
+      type: string
+    environment:
+      required: true
+      type: string
 
 jobs:
   feature-java-pipeline:
