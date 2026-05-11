@@ -34,14 +34,15 @@ jobs:
         echo "version: ${APP_VERSION}"
 
     - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
     - name: Verify Python
         run: |
           python --version
           pip --version
+          
     - name: install dependencies
       run:  |
         if [ -f requirements.txt ]; then
@@ -73,7 +74,7 @@ jobs:
       run: |
         docker build -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
         docker images
-        
+
     - name: Update docker build status
       if: always()
       uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
