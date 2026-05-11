@@ -3,6 +3,9 @@ name: NON-PROD Pipeline
 on:
   workflow_call:
     inputs:
+      component:
+        required: true
+        type: string
       version:
         required: true
         type: string
