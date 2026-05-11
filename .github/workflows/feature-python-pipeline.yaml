@@ -1,6 +1,7 @@
 name: feature-python-pipeline
+
 on:
-  workflow_call: # will be called by someone, should get inputs from caller
+  workflow_call:
     inputs:
       project:
         required: true
@@ -15,159 +16,128 @@ on:
 jobs:
   feature-python-pipeline:
     runs-on: [self-hosted, Linux, X64]
+
+    env:
+      ACC_ID: ${{ secrets.ACC_ID }}
+
     steps:
-    - name: checkout code
-      uses: actions/checkout@v6
-    - name: list files
-      run: ls -l
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-    - name: get the version
-      run: |
-        # if you store it in GITHUB_ENV, you can use in other steps in the same job
-        echo "APP_VERSION=${GITHUB_SHA::9}" >> "$GITHUB_ENV"
+      - name: List files
+        run: ls -l
 
-    - name: Install Python dependencies 
-      run: |     
-        sudo yum install -y python39 python3-devel gcc    
-        
-    - name: Verify Python     
-       run: |       
-        python3 --version   
-        pip3 --version   
+      - name: Get application version
+        run: |
+          echo "APP_VERSION=${GITHUB_SHA::9}" >> $GITHUB_ENV
 
-    - name: Upgrade pip 
-      run: |    
-        python3 -m pip install --upgrade pip setuptools wheel 
-                        
-    - name: Install requirements 
-      run: |    
-        if [ -f requirements.txt ]; then  
-         pip3 install -r requirements.txt  
-        else                            
-           echo "requirements.txt not found" 
-        fi  
-          
-    - name: Run unit tests  
-      id: unit_tests     
-      run: |      
-        if [ -d tests ]; then       
-          python3 -m pytest tests/  
-        else       
-          echo "No tests directory found"      
-        fi
-
-Another Important Thing
-Your Docker build uses:
-${ACC_ID}
-but I do not see ACC_ID defined anywhere.
-Add:
-env:  ACC_ID: ${{ secrets.ACC_ID }}
-either at workflow level or job level.
-Otherwise Docker build and push will fail.
-    
-    - name: print inputs
-      run: |
-        echo ${{ inputs.project }}
-        echo "Component: ${{ inputs.component }}"
-        echo "Environment: ${{ inputs.environment }}"
-        echo "version: ${APP_VERSION}"
-
-    - name: Setup Python
-      uses: actions/setup-python@v6
-      with:
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
           python-version: '3.9'
 
-    - name: Verify Python
-      run: |
+      - name: Verify Python
+        run: |
           python --version
           pip --version
 
-    - name: Install system dependencies
-      run: |
-        sudo yum install -y python39 python3-devel gcc
+      - name: Install system dependencies
+        run: |
+          sudo yum install -y python39 python3-devel gcc
 
-    - name: install dependencies
-      run:  |
-        if [ -f requirements.txt ]; then
-          pip install -r requirements.txt
-        else
-         echo "requirements.txt not found"
-        fi
+      - name: Upgrade pip
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
 
-    - name: run unit tests
-      id: unit_tests
-      run: |
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "requirements.txt not found"
+          fi
+
+      - name: Run unit tests
+        id: unit_tests
+        run: |
           if [ -d tests ]; then
             python -m pytest tests/
           else
             echo "No tests directory found"
           fi
 
-    - name: Update unit tests status
-      if: always()
-      uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.unit_tests.outcome }}     # success / failure / cancelled
-        context: UNIT_TESTS
-        description: ${{ steps.unit_tests.outcome }}
+      - name: Update unit tests status
+        if: always()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.unit_tests.outcome }}
+          context: UNIT_TESTS
+          description: ${{ steps.unit_tests.outcome }}
 
-    - name: docker build
-      id: docker_build
-      run: |
-        docker build -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
-        docker images
+      - name: Print inputs
+        run: |
+          echo "Project: ${{ inputs.project }}"
+          echo "Component: ${{ inputs.component }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Version: ${APP_VERSION}"
 
-    - name: Update docker build status
-      if: always()
-      uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.docker_build.outcome }}     # success / failure / cancelled
-        context: DOCKER_BUILD
-        description: ${{ steps.docker_build.outcome }}
+      - name: Docker build
+        id: docker_build
+        run: |
+          docker build -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
+          docker images
 
-    - name: Security Check (Dependabot + Trivy)
-      id: security_check
-      # env:
-      #   GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      shell: bash
-      run: |
+      - name: Update docker build status
+        if: always()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.docker_build.outcome }}
+          context: DOCKER_BUILD
+          description: ${{ steps.docker_build.outcome }}
 
-        echo "🔍 Running Trivy scan..."
-        trivy image \
-          --scanners vuln \
-          --severity HIGH,CRITICAL,MEDIUM \
-          --pkg-types os \
-          --exit-code 1 \
-          --format table \
-          ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+      - name: Security Check (Dependabot + Trivy)
+        id: security_check
+        shell: bash
+        run: |
+          echo "Running Trivy scan..."
 
-        TRIVY_RESULT=$?
+          trivy image \
+            --scanners vuln \
+            --severity HIGH,CRITICAL,MEDIUM \
+            --pkg-types os \
+            --exit-code 1 \
+            --format table \
+            ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
 
-        if [ "$TRIVY_RESULT" -ne 0 ]; then
-          echo "❌ Trivy found vulnerabilities (HIGH/CRITICAL/MEDIUM)"
-          exit 1
-        fi
+          TRIVY_RESULT=$?
 
-        echo "✅ Trivy scan passed without blocking issues."
+          if [ "$TRIVY_RESULT" -ne 0 ]; then
+            echo "Trivy found vulnerabilities (HIGH/CRITICAL/MEDIUM)"
+            exit 1
+          fi
 
-    - name: Update scan status
-      if: always()
-      uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
-      with:
-        sha: ${{ github.sha }}
-        state: ${{ steps.security_check.outcome }}     # success / failure / cancelled
-        context: SECURITY_CHECK
-        description: ${{ steps.security_check.outcome }}
+          echo "Trivy scan passed without blocking issues."
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v6.1.0
-      with:
-        aws-region: us-east-1
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    - name: push image
-      run: |
-        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com
-        docker push ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
+      - name: Update scan status
+        if: always()
+        uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
+        with:
+          sha: ${{ github.sha }}
+          state: ${{ steps.security_check.outcome }}
+          context: SECURITY_CHECK
+          description: ${{ steps.security_check.outcome }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6.1.0
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Push image
+        run: |
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com
+
+          docker push ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION}
