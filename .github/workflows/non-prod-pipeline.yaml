@@ -101,4 +101,4 @@ jobs:
           sha: ${{ github.sha }}
           state: ${{ steps.uat_deploy.outcome }}     # success / failure / cancelled
           context: UAT_DEPLOY
-          description: ${{ steps.dev_deploy.outcome }}
+          description: ${{ steps.uat_deploy.outcome }}
