@@ -29,13 +29,35 @@ jobs:
     - name: print inputs
       run: |
         echo ${{ inputs.project }}
+        echo "Component: ${{ inputs.component }}"
+        echo "Environment: ${{ inputs.environment }}"
         echo "version: ${APP_VERSION}"
 
+    - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+    - name: Verify Python
+        run: |
+          python --version
+          pip --version
     - name: install dependencies
-      run: npm install
+      run:  |
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        else
+         echo "requirements.txt not found"
+        fi
+
     - name: run unit tests
       id: unit_tests
-      run: echo "run unit tests"
+      run: |
+          if [ -d tests ]; then
+            python -m pytest tests/
+          else
+            echo "No tests directory found"
+          fi
 
     - name: Update unit tests status
       if: always()
@@ -51,6 +73,7 @@ jobs:
       run: |
         docker build -t ${ACC_ID}.dkr.ecr.us-east-1.amazonaws.com/${{ inputs.project }}/${{ inputs.component }}:${APP_VERSION} .
         docker images
+        
     - name: Update docker build status
       if: always()
       uses: rajasekharburri-git-actions/workflows/.github/actions/update-commit-status@main
