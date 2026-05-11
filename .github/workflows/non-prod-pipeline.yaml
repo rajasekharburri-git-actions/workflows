@@ -91,7 +91,7 @@ jobs:
            repository: rajasekharburri/${{ inputs.component }}-deploy
 
       - name: deploy to DEV cluster
-        id: dev_deploy
+        id: UAT_deploy
         run:
          "helm upgrade --install ${{ inputs.component}} -f values-${{ inputs.environment }}.yaml -n ${{ inputs.project }} --set deployment.imageVersion=${APP_VERSION} --atomic --wait --timeout=5m ."
 
@@ -101,5 +101,5 @@ jobs:
         with:
           sha: ${{ github.sha }}
           state: ${{ steps.dev_deploy.outcome }}     # success / failure / cancelled
-          context: DEV_DEPLOY
+          context: UAT_DEPLOY
           description: ${{ steps.dev_deploy.outcome }}
