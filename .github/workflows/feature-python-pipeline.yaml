@@ -26,6 +26,45 @@ jobs:
         # if you store it in GITHUB_ENV, you can use in other steps in the same job
         echo "APP_VERSION=${GITHUB_SHA::9}" >> "$GITHUB_ENV"
 
+    - name: Install Python dependencies 
+      run: |     
+        sudo yum install -y python39 python3-devel gcc    
+        
+    - name: Verify Python     
+       run: |       
+        python3 --version   
+        pip3 --version   
+
+    - name: Upgrade pip 
+      run: |    
+        python3 -m pip install --upgrade pip setuptools wheel 
+                        
+    - name: Install requirements 
+      run: |    
+        if [ -f requirements.txt ]; then  
+         pip3 install -r requirements.txt  
+        else                            
+           echo "requirements.txt not found" 
+        fi  
+          
+    - name: Run unit tests  
+      id: unit_tests     
+      run: |      
+        if [ -d tests ]; then       
+          python3 -m pytest tests/  
+        else       
+          echo "No tests directory found"      
+        fi
+
+Another Important Thing
+Your Docker build uses:
+${ACC_ID}
+but I do not see ACC_ID defined anywhere.
+Add:
+env:  ACC_ID: ${{ secrets.ACC_ID }}
+either at workflow level or job level.
+Otherwise Docker build and push will fail.
+    
     - name: print inputs
       run: |
         echo ${{ inputs.project }}
@@ -45,7 +84,7 @@ jobs:
 
     - name: Install system dependencies
       run: |
-        sudo yum install -y python3-devel gcc
+        sudo yum install -y python39 python3-devel gcc
 
     - name: install dependencies
       run:  |
