@@ -36,13 +36,13 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v6
       with:
-          python-version: '3.9.25'
+          python-version: '3.9'
 
     - name: Verify Python
       run: |
           python --version
           pip --version
-          
+
     - name: Install system dependencies
       run: |
         sudo yum install -y python3-devel gcc
