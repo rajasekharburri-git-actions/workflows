@@ -30,11 +30,10 @@ jobs:
       - name: Get application version
         run: echo "APP_VERSION=${GITHUB_SHA::9}" >> $GITHUB_ENV
 
-      - name: Setup Python
-        uses: actions/setup-python@v6                 # v5 is latest stable
+      - uses: actions/setup-python@v6
         with:
-          python-version: '3.13'                        # latest stable Python
-          cache: 'pip'                                  # cache pip dependencies
+          python-version: "3.13"  #All versions from 3.6 to 3.13 are not the same.
+          cache: "pip"                                 # cache pip dependencies
 
       - name: Verify Python
         run: |
